@@ -30,4 +30,12 @@ We plan to leverage large pre-trained Transformer Encoder to apply to various im
 
 * [U-Net: Convolution Networks for Biomedical Image Segmentation](https://arxiv.org/abs/1505.04597) [(Repository)](https://github.com/zhixuhao/unet)
 * [TransUNet: Transformers Make Strong Encoders for Medical Image Segmentation](https://arxiv.org/abs/2102.04306) [(Repository)](https://github.com/Beckschen/TransUNet)
-* 
+
+## Important Dates
+* April 25 : Progress 1
+* May 2: Review 1
+* May 9: Rebuttal 1
+* May 23: Progress 2
+* May 30: Review 2
+* June 6: Presentation
+* June 20: Final Report
