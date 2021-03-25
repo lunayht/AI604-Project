@@ -46,3 +46,6 @@ https://github.com/CancerDataScience/CrowdsourcingDataset-Amgadetal2019
 
 ### Trello Link
 https://trello.com/b/IwPkoJy9/ai604
+
+## Project Gantt Chart
+![project_gantt_chart](images/project_gantt_chart.png)
