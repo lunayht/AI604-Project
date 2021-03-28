@@ -23,7 +23,7 @@
 \begin{document}
 
 %%%%%%%%% TITLE
-\title{Vision Transformer for Biomedical Image Segmentations}
+\title{Vision Transformer for Biomedical Image Segmentation}
 \author{Bedionita Soro (20205677), Ying Hui Tan (20204871), Oh Joon Kwon (20213044)}
 
 \maketitle
@@ -35,7 +35,7 @@ Nevertheless, it requires a large amount of training data, and histological imag
 
 
 \section{Introduction}
-Semantic segmentation is crucial in biomedical image analytics, yet requires heavy workload for manual annotation. Segmentation task can become very difficult for the pathologists even with high-expertise due to other organs, artifacts, and fatigue \cite{KRUPINSKI20061543}. This is because they often have to screen all the whole slide images (WSI) to find regions of interest with abnormal tissues or organs \cite{Randell01}. Recently, several semantic segmentation methods exploiting deep learning have been developed for histo-pathological images or organ segmentation \cite{lei2020medical}. However, most of these existing methods not only focus on a specific organ or tissue \cite{chan2019histosegnet}, but they have not largely investigated domain adaptation techniques with organs from different domains.
+Semantic segmentation is crucial in biomedical image analytics, yet requires heavy workload for manual annotation. Segmentation task can become very difficult for the pathologists even with high-expertise due to other organs, noise and artifacts\cite{KRUPINSKI20061543}. Moreover, human annotators tend to be fatigued because they often have to screen all the whole slide images (WSI) to find regions of interest with abnormal tissues or organs \cite{Randell01}. Recently, several semantic segmentation methods exploiting deep learning have been developed for histo-pathological images or organ segmentation \cite{lei2020medical}. However, most of these existing methods not only focus on a specific organ or tissue \cite{chan2019histosegnet}, but they have not largely investigated domain adaptation techniques with organs from different domains.
 
 In this paper, we propose a semantic segmentation method with Transformer architecture \cite{vaswani2017attention} to semantically segment and identify different type of cancer regions in the WSI for breast cancer detection. We then extend this approach to segment COVID-19's lesion in lung \cite{9385788} using domain adaptation. This allows us a model to generalize over totally different domains with less effort.
 
@@ -55,9 +55,9 @@ The first objective of this study is to propose a deep neural network model that
 % \section{related work}
 
 \section{Method}
-The proposed method integrates recent state-of-the-art deep learning model in image classification known as Vision Transformer (ViT) \cite{dosovitskiy2020image}. Transformer, proposed by Vaswani et al.\cite{vaswani2017attention}, makes use of multi-head self-attention mechanism that can easily be scaled with large datasets. While the widely used methods in image segmentation uses convolutional neural networks (CNN) as their building blocks, parameter sharing nature of CNNs often introduces inductive bias when adapted to different data domains \cite{cohen2017inductive}. This leads to degraded model performance in these domains.
+The proposed method integrates recent state-of-the-art deep learning model in image classification known as Vision Transformer (ViT) \cite{dosovitskiy2020image}. Transformer, proposed by Vaswani et al.\cite{vaswani2017attention}, makes use of multi-head self-attention mechanism that can easily be scaled with large datasets. While the widely used methods in image segmentation uses convolutional neural networks (CNN) as their building blocks, parameter sharing nature of CNNs often introduces inductive bias when adapted to different data domains \cite{cohen2017inductive}. This leads to degraded model performance in inexperienced domains.
 
-Pretrained Transformer models have been shown to be flexible when fine-tuned for down-stream tasks, both in natural language processing and computer vision. While it can be computationally expensive to pretrain the models on large datasets, Transformers often excel at adapting to different domains which makes it ideal for transfer learning and possibly domain adaptation. Moreover, the nature of semantic segmentation task requires the contextual understanding of the relationship among image regions. The self-attention mechanism that is built into Transformers could boost the model performance in such a task.
+Pretrained Transformer models have been shown to be flexible when fine-tuned for down-stream tasks, both in natural language processing and computer vision \cite{devlin2019bert,radford2019language}. While it can be computationally expensive to pretrain the models on large datasets, Transformers often excel at adapting to different domains which makes it ideal for transfer learning and possibly domain adaptation. Moreover, the nature of semantic segmentation task requires the contextual understanding of the relationship among image regions. The self-attention mechanism that is built into Transformers could boost the model performance in such a task.
 
 \begin{figure}[h!]
 \begin{center}
@@ -69,7 +69,7 @@ Pretrained Transformer models have been shown to be flexible when fine-tuned for
 % \label{fig:onecol}
 \end{figure}
 
-As shown in Figure \ref{fig:roi}, the first step of in this work is to build a deep learning model that will receive patches of WSIs and output the probabilities of the dominant diseases as well as the segmented version of the WSIs where each tissue type is mapped to the region of interest. Both segmentation and classification will be combined to achieve this objective. For the lung lesion segmentation, the same model will be used as a baseline. To that end, different techniques for domain adaptation will be explored such as self-supervised learning and transfer learning.
+As shown in Figure \ref{fig:roi}, the first step of in this work is to build a deep learning model with Vision Transformers as input that will receive patches of WSIs and encodes the image, then outputs the probabilities of the dominant diseases as well as the segmented version of the WSIs where each tissue type is mapped to the region of interest. Both segmentation and classification objective functions will be combined to achieve this taskz. For the lung lesion segmentation, the same model will be used as a baseline. To that end, different techniques for domain adaptation will be explored such as self-supervised learning and transfer learning.
 
 \subsection{Evaluation metric}
 To evaluate the proposed method, we aim to use two different metrics for prediction and segmentation. The prediction level metric consists of: \textit{F1}, \textit{precision}, and the \textit{sensitivity} as defined in \ref{metric1}
