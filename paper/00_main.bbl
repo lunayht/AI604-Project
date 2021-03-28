@@ -1,0 +1,100 @@
+\begin{thebibliography}{10}\itemsep=-1pt
+
+\bibitem{10.1093/bioinformatics/btz083}
+Mohamed Amgad, Habiba Elfandy, Hagar Hussein, Lamees~A Atteya, Mai A~T
+  Elsebaie, Lamia~S Abo~Elnasr, Rokia~A Sakr, Hazem S~E Salem, Ahmed~F Ismail,
+  Anas~M Saad, Joumana Ahmed, Maha A~T Elsebaie, Mustafijur Rahman, Inas~A
+  Ruhban, Nada~M Elgazar, Yahya Alagha, Mohamed~H Osman, Ahmed~M Alhusseiny,
+  Mariam~M Khalaf, Abo-Alela~F Younes, Ali Abdulkarim, Duaa~M Younes, Ahmed~M
+  Gadallah, Ahmad~M Elkashash, Salma~Y Fala, Basma~M Zaki, Jonathan Beezley,
+  Deepak~R Chittajallu, David Manthey, David~A Gutman, and Lee A~D Cooper.
+\newblock {Structured crowdsourcing enables convolutional segmentation of
+  histology images}.
+\newblock {\em Bioinformatics}, 35(18):3461--3467, 02 2019.
+
+\bibitem{chan2019histosegnet}
+Lyndon Chan, Mahdi~S. Hosseini, Corwyn Rowsell, Konstantinos~N. Plataniotis,
+  and Savvas Damaskinos.
+\newblock Histosegnet: Semantic segmentation of histological tissue type in
+  whole slide images.
+\newblock In {\em The IEEE International Conference on Computer Vision (ICCV)},
+  October 2019.
+
+\bibitem{chen2021transunet}
+Jieneng Chen, Yongyi Lu, Qihang Yu, Xiangde Luo, Ehsan Adeli, Yan Wang, Le Lu,
+  Alan~L. Yuille, and Yuyin Zhou.
+\newblock Transunet: Transformers make strong encoders for medical image
+  segmentation, 2021.
+
+\bibitem{cohen2017inductive}
+Nadav Cohen and Amnon Shashua.
+\newblock Inductive bias of deep convolutional networks through pooling
+  geometry, 2017.
+
+\bibitem{dosovitskiy2020image}
+Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn,
+  Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg
+  Heigold, Sylvain Gelly, Jakob Uszkoreit, and Neil Houlsby.
+\newblock An image is worth 16x16 words: Transformers for image recognition at
+  scale, 2020.
+
+\bibitem{Fu_2018}
+Xiaohang Fu, Tong Liu, Zhaohan Xiong, Bruce~H. Smaill, Martin~K. Stiles, and
+  Jichao Zhao.
+\newblock Segmentation of histological images and fibrosis identification with
+  a convolutional neural network.
+\newblock {\em Computers in Biology and Medicine}, 98:147–158, Jul 2018.
+
+\bibitem{Gunraj2020}
+Hayden Gunraj, Linda Wang, and Alexander Wong.
+\newblock Covidnet-ct: A tailored deep convolutional neural network design for
+  detection of covid-19 cases from chest ct images.
+\newblock {\em Frontiers in Medicine}, 7:1025, 2020.
+
+\bibitem{He2020.04.13.20063941}
+Xuehai He, Xingyi Yang, Shanghang Zhang, Jinyu Zhao, Yichen Zhang, Eric Xing,
+  and Pengtao Xie.
+\newblock Sample-efficient deep learning for covid-19 diagnosis based on ct
+  scans.
+\newblock {\em medRxiv}, 2020.
+
+\bibitem{KRUPINSKI20061543}
+Elizabeth~A Krupinski, Allison~A. Tillack, Lynne Richter, Jeffrey~T. Henderson,
+  Achyut~K. Bhattacharyya, Katherine~M. Scott, Anna~R. Graham, Michael~R.
+  Descour, John~R. Davis, and Ronald~S. Weinstein.
+\newblock Eye-movement study and human performance using telepathology virtual
+  slides. implications for medical education and differences with experience.
+\newblock {\em Human Pathology}, 37(12):1543--1556, 2006.
+
+\bibitem{lei2020medical}
+Tao Lei, Risheng Wang, Yong Wan, Bingtao Zhang, Hongying Meng, and Asoke~K.
+  Nandi.
+\newblock Medical image segmentation using deep learning: A survey, 2020.
+
+\bibitem{Randell01}
+Rhys Thomas \& Darren~Treanor Rebecca~Randell, Roy A.~Ruddle.
+\newblock Diagnosis at the microscope: a workplace study of histopathology.
+\newblock {\em Cognition, Technology \& Work}, 14:319–335, 2014.
+
+\bibitem{touvron2021training}
+Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco Massa, Alexandre
+  Sablayrolles, and Hervé Jégou.
+\newblock Training data-efficient image transformers \& distillation through
+  attention, 2021.
+
+\bibitem{vaswani2017attention}
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+  Aidan~N. Gomez, Lukasz Kaiser, and Illia Polosukhin.
+\newblock Attention is all you need, 2017.
+
+\bibitem{9385788}
+Q. {Yao}, L. {Xiao}, P. {Liu}, and S. {Kevin Zhou}.
+\newblock Label-free segmentation of covid-19 lesions in lung ct.
+\newblock {\em IEEE Transactions on Medical Imaging}, pages 1--1, 2021.
+
+\bibitem{zhao2020COVID-CT-Dataset}
+Jinyu Zhao, Yichen Zhang, Xuehai He, and Pengtao Xie.
+\newblock Covid-ct-dataset: a ct scan dataset about covid-19.
+\newblock {\em arXiv preprint arXiv:2003.13865}, 2020.
+
+\end{thebibliography}
