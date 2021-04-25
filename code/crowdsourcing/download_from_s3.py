@@ -11,6 +11,7 @@ BUCKET_NAME = "ai604"
 PREFIXS = [
     "dataset/images/",
     "dataset/masks/",
+    "dataset/annotations/",
     "dataset/meta/"
 ]
 
