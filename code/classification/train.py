@@ -1,6 +1,8 @@
 import os
 import sys
 import yaml
+import random
+
 import torch
 import wandb
 import timm
@@ -68,6 +70,15 @@ class Arguments:
                 #     self.__setattr__(k, '')
             except AttributeError:
                 raise Exception('No config parameter {} found ...'.format(k))
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # if use multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
 
 def plot_confusion_matrix(logits: "torch.Tensor", labels: "torch.Tensor", num_classes: int):
     label_dict = {'B': 0, 'M': 1}
@@ -146,11 +157,12 @@ def train(
     step = 0
 
     model.to(device)
+    
+    train_losses = list()
+    valid_losses = list()
     for epoch in range(args.num_epochs):
-        train_losses = list()
-        valid_losses = list()
         # Train
-        mean_train_loss = 0
+        tot, mean_train_loss = 0, 0
         model.train()
         for batch in train_loader:
             current_progress = step / len(train_loader)
@@ -163,7 +175,8 @@ def train(
 
             # Loss logging
             item_loss = losses.detach().item()
-            mean_train_loss = (item_loss * len(images)) / len(train_loader)
+            tot += len(labels)
+            mean_train_loss += (item_loss * len(images))
 
             losses /= args.grad_accumulation_steps
             accelerator.backward(losses)
@@ -185,12 +198,14 @@ def train(
                 # Update progress bar
                 progress.update(1)
             step += 1
-        train_losses.append(mean_train_loss)
+        train_losses.append(mean_train_loss / tot)
         
         # Validation
         mean_valid_loss, valid_logits, valid_labels = validate(model, valid_loader, valid_criterion, accelerator, step, current_progress, args)
         metric = compute_metric(valid_logits, valid_labels, args.num_classes)
         valid_losses.append(mean_valid_loss)
+
+        # Log Validation Metric
         wandb.log(metric, step=step, commit=False)
 
         acc = metric['top@1_acc']
@@ -199,17 +214,19 @@ def train(
             
             if args.save_model:
                 # Saving model
-                save_path = '{}_{}_{}_c{}_{}.pt'.format(
+                save_path = '{}_{}_{}_c{}{}_{}.pt'.format(
                     args.model_class,
                     'pretrained' if args.pretrained else 'scratch',
                     args.magnification,
-                    args.class_num,
+                    args.num_classes,
+                    '_aug' if args.augmentation else '',
                     step
                 )
                 print('Best model found ... Saving at {} ...'.format(save_path))
                 unwrapped_model = accelerator.unwrap_model(model)
                 accelerator.save(unwrapped_model.state_dict(), save_path)
 
+    # Log End Summary Metric
     matrix, _ = plot_confusion_matrix(valid_logits, valid_labels, args.num_classes)
     wandb.log({
         'confusion_matrix': matrix,
@@ -221,6 +238,7 @@ def train(
             xname='epochs'
         )
     })
+    wandb.run.summary['best_acc'] = max_acc
 
 @torch.no_grad()
 def validate(
@@ -235,7 +253,7 @@ def validate(
     device = accelerator.device
     all_logits, all_labels = list(), list()
     
-    mean_valid_loss = 0
+    tot, mean_valid_loss = 0, 0
     model.eval()
     for batch in loader:
         images = batch['images'].to(device)
@@ -245,14 +263,15 @@ def validate(
 
         losses = criterion(logits, labels)
         item_loss = losses.detach().item()
-        mean_valid_loss += (item_loss * len(labels)) / len(loader)
+        tot += len(labels)
+        mean_valid_loss += (item_loss * len(labels))
         loader.set_description('Validation Loss: {:.5f}'.format(item_loss))
 
         all_logits.append(accelerator.gather(logits))
         all_labels.append(accelerator.gather(labels.unsqueeze(-1)))
-
+    
     all_logits, all_labels = torch.cat(all_logits, dim=0), torch.cat(all_labels, dim=0)
-    return mean_valid_loss, all_logits, all_labels
+    return mean_valid_loss / tot, all_logits, all_labels
 
 def main():
     parser = ArgumentParser()
@@ -261,11 +280,24 @@ def main():
     args = parser.add_arguments(Arguments(config=config), dest='options')
     args = parser.parse_args().options
 
+    assert args.magnification in ('40X', '100X', '200X', '400X', 'all')
+
+    # Set random seed for reproducibility
+    set_seed(args.seed)
+
     # Accelerator (syntatic sugar for distributed / fp16 training)
     accelerator = Accelerator(fp16=args.amp, cpu=True if args.device=='cpu' else False)
 
     # Dataset
-    data = BreakHisDataset(args.num_classes, args.data_dir, args.magnification)
+    if args.magnification == 'all':
+        list_data = [BreakHisDataset(args.num_classes,
+                                     args.data_dir,
+                                     magnification=mag) for mag in ('100X', '200X', '400X')]
+        data = BreakHisDataset(args.num_classes, args.data_dir, magnification='40X')
+        for i in list_data:
+            data = data + i
+    else:
+        data = BreakHisDataset(args.num_classes, args.data_dir, args.magnification)
 
     train_ln = int(len(data) * args.train_split)
     valid_ln = len(data) - train_ln
@@ -311,6 +343,16 @@ def main():
     rank = os.environ.get('RANK', -1)
     if rank == 0 or rank == -1:
         wandb.init(project='vit-domain-adapt', config=args)
+
+        run_name = '{}_{}_{}_c{}{}'.format(
+                    args.model_class,
+                    'pretrained' if args.pretrained else 'scratch',
+                    args.magnification,
+                    args.num_classes,
+                    '_aug' if args.augmentation else ''
+                )
+        wandb.run.name = run_name
+
     # Train
     train(model, optimizer, scheduler, accelerator, train_loader, valid_loader, args, total_steps)
 

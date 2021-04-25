@@ -49,11 +49,17 @@ BIN_LABELS = {k[0]: 1 if k[0] in ('DC', 'LC', 'MC', 'PC') else 0 for v, k in enu
 """
 
 class BreakHisDataset(Dataset):
-    def __init__(self, num_classes: int, data_path: str='./combined', magnification: str='40X'):
+    def __init__(self, num_classes: int, data_path: str='./combined', magnification: str='40X', files: Optional[List]=None):
         super().__init__()
 
-        paths = os.path.join(data_path, magnification, '*.png')
-        self.files = glob.glob(paths)
+        self.magnification = magnification
+        self.num_classes = num_classes
+
+        if files is not None:
+            self.files = files
+        else:
+            paths = os.path.join(data_path, magnification, '*.png')
+            self.files = glob.glob(paths)
         
         # Function for getting the label
         if num_classes == 8:
@@ -77,6 +83,11 @@ class BreakHisDataset(Dataset):
                 'images': np.array(img / 255.0, dtype=np.float32),
                 'labels': lbl
             }
+
+    def __add__(self, other):
+        assert self.num_classes == other.num_classes
+        self.files.extend(other.files)
+        return self
 
 class BatchCollector:
     """
