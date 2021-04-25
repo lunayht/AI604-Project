@@ -42,7 +42,9 @@ We plan to leverage large pre-trained Transformer Encoder to apply to various im
 * June 20: Final Report
 
 ## Training dataset
-https://github.com/CancerDataScience/CrowdsourcingDataset-Amgadetal2019
+https://github.com/CancerDataScience/CrowdsourcingDataset-Amgadetal2019 
+
+Run ```sh download_crowdsourcing.sh``` in [code/crowdsourcing](code/crowdsourcing/) to download crowdsourcing breast cancer dataset from s3 bucket. 
 
 ### Trello Link
 https://trello.com/b/IwPkoJy9/ai604
