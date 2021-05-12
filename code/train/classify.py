@@ -186,7 +186,7 @@ def main():
     # Set random seed for reproducibility
     set_seed(args.seed)
 
-    # Accelerator (syntatic sugar for distributed / fp16 training)
+    # Accelerator (syntactic sugar for distributed / fp16 training)
     accelerator = Accelerator(fp16=args.amp, cpu=True if args.device=='cpu' else False)
 
     # Compute input size based on image size and patch size
