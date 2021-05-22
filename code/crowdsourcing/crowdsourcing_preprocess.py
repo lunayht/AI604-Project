@@ -11,7 +11,7 @@ IMAGES_PATH = "dataset/images"  # Original Images Folder
 MASKS_PATH = "dataset/masks"  # Original Masks Folder
 IMAGE_PATCHES = "dataset/patches/images"  # Destination (Images)
 MASK_PATCHES = "dataset/patches/masks"  # Destination (Masks)
-PATCH_SIZE = 1024
+PATCH_SIZE = 512
 
 
 def create_folder(foldername: str):
@@ -67,7 +67,8 @@ if __name__ == "__main__":
         new_mask = pad_image(mask, PATCH_SIZE)
         idx = 0
         for img_patch, mask_patch in zip(
-            generate_image_patches(new_img), generate_image_patches(new_mask)
+            generate_image_patches(new_img, PATCH_SIZE),
+            generate_image_patches(new_mask, PATCH_SIZE),
         ):
             outside_roi = np.all(mask_patch == 0)
             if not outside_roi:
