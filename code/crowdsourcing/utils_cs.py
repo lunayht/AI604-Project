@@ -12,6 +12,7 @@ def mIoU(pred_mask, mask, smooth=1e-10, n_classes=22):
         mask = mask.contiguous().view(-1)
 
         iou_per_class = []
+        dice_per_class = []
         for clas in range(0, n_classes):  # loop per pixel class
             true_class = pred_mask == clas
             true_label = mask == clas
@@ -25,8 +26,10 @@ def mIoU(pred_mask, mask, smooth=1e-10, n_classes=22):
                 union = torch.logical_or(true_class, true_label).sum().float().item()
 
                 iou = (intersect + smooth) / (union + smooth)
+                dice = (2 * intersect + smooth) / (union + smooth)
                 iou_per_class.append(iou)
-        return np.nanmean(iou_per_class)
+                dice_per_class.append(dice)
+        return np.nanmean(iou_per_class), np.nanmean(dice_per_class)
 
 
 def pixel_accuracy(output, mask):
