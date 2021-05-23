@@ -1,7 +1,8 @@
 import numpy as np
-import torch
+import torch # torch >= 1.7.1
 import torch.nn.functional as F
 from torchvision import transforms as T
+from tqdm import tqdm
 
 
 def mIoU(pred_mask, mask, smooth=1e-10, n_classes=22):
@@ -39,8 +40,6 @@ def pixel_accuracy(output, mask):
         accuracy = float(correct.sum()) / float(correct.numel())
     return accuracy
 
-def test_fun(d=0):
-    print(d)
 
 def predict_image_mask_miou(
     model,
@@ -48,7 +47,7 @@ def predict_image_mask_miou(
     mask,
     mean=[0.60258, 0.44218, 0.57057],
     std=[0.30052, 0.27571, 0.27647],
-    device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ):
     model.eval()
     t = T.Compose([T.ToTensor(), T.Normalize(mean, std)])
@@ -74,7 +73,7 @@ def predict_image_mask_pixel(
     mask,
     mean=[0.60258, 0.44218, 0.57057],
     std=[0.30052, 0.27571, 0.27647],
-    device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ):
     model.eval()
     t = T.Compose([T.ToTensor(), T.Normalize(mean, std)])
@@ -98,7 +97,7 @@ def miou_score(model, test_set):
     score_iou = []
     for i in tqdm(range(len(test_set))):
         img, mask = test_set[i]
-        pred_mask, score = predict_image_mask_miou(model, img, mask)
+        _, score = predict_image_mask_miou(model, img, mask)
         score_iou.append(score)
     return score_iou
 
@@ -107,6 +106,6 @@ def pixel_acc(model, test_set):
     accuracy = []
     for i in tqdm(range(len(test_set))):
         img, mask = test_set[i]
-        pred_mask, acc = predict_image_mask_pixel(model, img, mask)
+        _, acc = predict_image_mask_pixel(model, img, mask)
         accuracy.append(acc)
     return accuracy
