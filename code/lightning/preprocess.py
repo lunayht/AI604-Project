@@ -94,41 +94,35 @@ class ClassificationBatchCollector:
     """Batch collector for classification using in DataLoader.collate_fn"""
     def __init__(
         self,
+        image_size  : Tuple[int, int], # This is input size for model
         patch_size  : Tuple[int, int],
-        image_mean  : List[float]=[0.5, 0.5, 0.5],
-        image_std   : List[float]=[0.5, 0.5, 0.5],
         pad_mode    : Optional[str]="constant",
-        do_normalize: Optional[bool]=True,
+        do_resize   : Optional[bool]=False,
         do_augment  : Optional[bool]=False,
-        augmentation: Optional[List["Transform"]]=None
+        transforms  : Optional["Transform"]=None
     ):
+        self.i_h, self.i_w = image_size
         self.p_h, self.p_w = patch_size
-        self.image_mean = np.array(image_mean)
-        self.image_std  = np.array(image_std)
 
         self.pad_mode = getattr(cv2, 'BORDER_{}'.format(pad_mode.upper()))
         assert self.pad_mode in (0, 1, 2, 3, 4)
-        self.do_normalize = do_normalize
+        self.do_resize = do_resize
         self.do_augment = do_augment
-        self.augmentation = augmentation
+        self.transforms = transforms
 
     def __call__(self, batch):
         images, labels = zip(*batch)
-        images = [self.padding(image) for image in images]
-        assert len(set([i.shape for i in images])) == 1
-        if self.do_normalize:
-            images = [self.normalize(image=image)  for image in images]
-        if self.do_augment:
-            images = [self.augmentation(image=image)['image'] for image in images]
+        if not self.do_resize:
+            images = [self.padding(image) for image in images]
+        images = [self.transforms(image=image)['image'] for image in images]
         images = [image.transpose(2, 0, 1) for image in images]
-
         return torch.tensor(images), torch.tensor(labels)
         
     def padding(self, image: "np.ndarray") -> "np.ndarray":
         """Pads image with predefined border type"""
         h, w, _ = image.shape
-        h_to_pad = self.p_h - (h % self.p_h)
-        w_to_pad = self.p_w - (w % self.p_w)
+        h_to_pad = self.i_h - h
+        w_to_pad = self.i_w - w
 
         top, lft = h_to_pad // 2, w_to_pad // 2
         bot, rht = h_to_pad - top, w_to_pad - lft
@@ -139,11 +133,3 @@ class ClassificationBatchCollector:
             self.pad_mode
         )
         return padded
-
-    def normalize(self, image: 'np.ndarray') -> 'np.ndarray':
-        mean = self.image_mean.astype(image.dtype)
-        std  = self.image_std.astype(image.dtype)
-        if image.ndim == 3 and image.shape[2] in [1,3]:
-            return (image - mean[None, None, :]) / std[None, None, :]
-        else:
-            return (image - mean) / std

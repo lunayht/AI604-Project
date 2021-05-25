@@ -6,33 +6,36 @@ wandb: True
 num_classes_classification: 2
 num_classes_segmentation: 22
 
-image_size: [460, 700]
-patch_size: [32, 32]
+image_size: [224, 224] # [460, 700]
+patch_size: [16, 16]
+
+data_dir: combined
+magnification: 40X
 
 pad_mode: constant
+resize: True
 augmentation: True
 train_split: 0.7
 
 model_name: vit_base_patch16_224
-pretrained: False
+pretrained: True
 
 gpus: 1
 seed: 42
+
 amp: True
-
 data_dir: ./data/breakhis
-magnification: 40X
-
 amp_backend: 'native' # Do not change
 accumulate_grad_batches: 8
 grad_clipping: False
 grad_max_norm: 1.0
 
-max_epochs: 15
-batch_size: 8
+max_epochs: 75
+batch_size: 16
 drop_rate: 0.3
 
-learning_rate: 1e-3
+scheduler: False
+learning_rate: !!float 3e-5
 eps: !!float 1e-8
 beta_1: 0.99
 beta_2: 0.999

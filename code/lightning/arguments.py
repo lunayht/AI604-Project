@@ -7,8 +7,8 @@ class BaseArgs:
 
     wandb: bool = field(default=False)
 
-    classification: bool=field(default=True)
-    segmentation: bool=field(default=False)
+    classification: bool = field(default=True)
+    segmentation: bool = field(default=False)
 
     amp: bool = field(default=False)
     gpus: str = field(default='1')
@@ -16,6 +16,8 @@ class BaseArgs:
     max_epochs: int = field(default=3)
     batch_size: int = field(default=1)
     drop_rate: int = field(default=0.0)
+
+    scheduler: bool = field(default=False)
 
     learning_rate: float = field(default=1e-5)
     eps: float = field(default=1e-8)
@@ -53,6 +55,8 @@ class ClassificationArgs(BaseArgs):
     pad_mode: str = field(default='constant')
     augmentation: bool = field(default=False)
     train_split: float = field(default=0.7)
+
+    resize: bool = field(default=False)
 
     model_name: str = field(default='vit_base_patch16_224')
     pretrained: bool = field(default=False)
