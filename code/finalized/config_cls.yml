@@ -23,7 +23,6 @@ accumulate_grad_batches: 4
 grad_clipping: False
 grad_max_norm: 1.0
 
-scheduler: False
 learning_rate: !!float 3e-5
 eps: !!float 1e-8
 beta_1: 0.99
