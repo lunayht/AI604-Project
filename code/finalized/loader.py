@@ -72,52 +72,48 @@ class BreakHisDataset(Dataset):
             self.get_label = lambda x: LABELS.get(x.split('_')[2].split('-')[0])
         else:
             self.get_label = lambda x: BIN_LABELS.get(x.split('_')[2].split('-')[0])
-
-    @lru_cache(maxsize=None)
-    def io_cache(self, f):
-        """Reads images from disk with LRU caching"""
-        img = cv2.imread(f)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = np.array(img / 255.0, dtype=np.float32)
-        lbl = self.get_label(f)
-        return img, lbl
-        
+       
     def __len__(self):
         return len(self.files)
 
-    def __getitem__(self, idx):
-        f = self.files[idx]
-        img, lbl = self.io_cache(f)
+    @lru_cache(maxsize=None)
+    def cache(self, file):
+        """Disk read/write with lru caching for reducing NAS communication overhead"""
+        img = cv2.imread(file)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        lbl = self.get_label(file)
         return img, lbl
 
+    def __getitem__(self, idx):
+        f = self.files[idx]
+        return self.cache(f)    
 class ClassificationBatchCollector:
     """Batch collector for classification using in DataLoader.collate_fn"""
     def __init__(
         self,
-        image_size  : Tuple[int, int], # This is input size for model
-        patch_size  : Tuple[int, int],
-        pad_mode    : Optional[str]="constant",
-        do_resize   : Optional[bool]=False,
-        do_augment  : Optional[bool]=False,
-        transforms  : Optional["Transform"]=None
+        image_size : Tuple[int, int], # This is input size for model
+        patch_size : Tuple[int, int],
+        transforms : "Transform",
+        pad_mode : Optional[str]="constant",
+        resize   : Optional[bool]=False
     ):
         self.i_h, self.i_w = image_size
         self.p_h, self.p_w = patch_size
-
-        self.pad_mode = getattr(cv2, 'BORDER_{}'.format(pad_mode.upper()))
-        assert self.pad_mode in (0, 1, 2, 3, 4)
-        self.do_resize = do_resize
-        self.do_augment = do_augment
         self.transforms = transforms
+        self.pad_mode = getattr(cv2, 'BORDER_{}'.format(pad_mode.upper()))
+        self.resize = resize
 
+        assert self.pad_mode in (0, 1, 2, 3, 4)
+        
     def __call__(self, batch):
         images, labels = zip(*batch)
-        if not self.do_resize:
+        if not self.resize:
             images = [self.padding(image) for image in images]
         images = [self.transforms(image=image)['image'] for image in images]
         images = [image.transpose(2, 0, 1) for image in images]
         return torch.tensor(images), torch.tensor(labels)
-        
+        # return torch.tensor(images)
+
     def padding(self, image: "np.ndarray") -> "np.ndarray":
         """Pads image with predefined border type"""
         h, w, _ = image.shape
@@ -133,3 +129,37 @@ class ClassificationBatchCollector:
             self.pad_mode
         )
         return padded
+
+
+
+
+class CrowdsourcingDataset(Dataset):
+    def __init__(
+        self,
+        data_path: Optional[str]='dataset/crowdsourcing',
+        split: Optional[str]='train'
+    ):
+        super().__init__()
+
+        img_path = os.path.join(data_path, split, 'images', '*.png')
+        msk_path = os.path.join(data_path, split, 'masks', '*.png')
+        self.image_files = glob.glob(img_path)
+        self.mask_files  = glob.glob(msk_path)
+
+        assert len(self.image_files) == len(self.mask_files)
+
+    @lru_cache(maxsize=None)
+    def io_cache(self, img, msk):
+        img = cv2.imread(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BAYER_BGR2RGB)
+
+        msk = cv2.imread(msk)
+        msk = np.array(msk, dtype=np.float32)
+        return img, msk
+    
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        img, mask = self.image_files[idx], self.label_files[idx]
+        # TODO

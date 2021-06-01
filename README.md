@@ -2,14 +2,14 @@
 
 ## General Idea
 
-We aim to leverage the Transformer architecture to address domain adaptation problem due to CNN's inherent inductive bias. The Transformer architecture has been shown to work in various domains of data formats, including NLP, time series, and most recently, images. 
+We aim to leverage the Vision Transformer (ViT) and its variants to achieve better performance in classification and segmentation of medical images. We try to take advantage of patch-wise operation of ViT.
 
-[An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale](https://arxiv.org/abs/2010.11929)
 
-### Repositories
-[google-research](https://github.com/google-research/vision_transformer)
-[lucidrains](https://github.com/lucidrains/vit-pytorch)
-[jeonsworld](https://github.com/jeonsworld/ViT-pytorch)
+### Repositories on ViT
+* [google-research](https://github.com/google-research/vision_transformer)
+* [lucidrains](https://github.com/lucidrains/vit-pytorch)
+* [jeonsworld](https://github.com/jeonsworld/ViT-pytorch)
+* [pytorch-image-models](https://github.com/rwightman/pytorch-image-models)
 
 ```
 @misc{dosovitskiy2020image,
@@ -22,9 +22,37 @@ We aim to leverage the Transformer architecture to address domain adaptation pro
 }
 ```
 
-We plan to leverage large pre-trained Transformer Encoder to apply to various image domains, possibly combined with CNNs. 
+## Datasets
 
-## Some papers
+### Classification ([BreakHis](https://web.inf.ufpr.br/vri/databases/breast-cancer-histopathological-database-breakhis/))
+
+```
+@article{spanhol2015dataset,
+  title={A dataset for breast cancer histopathological image classification},
+  author={Spanhol, Fabio A and Oliveira, Luiz S and Petitjean, Caroline and Heutte, Laurent},
+  journal={Ieee transactions on biomedical engineering},
+  volume={63},
+  number={7},
+  pages={1455--1462},
+  year={2015},
+  publisher={IEEE}
+}
+```
+### Segmentation ([CrowdSourcing](https://github.com/CancerDataScience/CrowdsourcingDataset-Amgadetal2019))
+
+```
+@article{amgad2019structured,
+  title={Structured crowdsourcing enables convolutional segmentation of histology images},
+  author={Amgad, Mohamed and Elfandy, Habiba and Hussein, Hagar and Atteya, Lamees A and Elsebaie, Mai AT and Abo Elnasr, Lamia S and Sakr, Rokia A and Salem, Hazem SE and Ismail, Ahmed F and Saad, Anas M and others},
+  journal={Bioinformatics},
+  volume={35},
+  number={18},
+  pages={3461--3467},
+  year={2019},
+  publisher={Oxford University Press}
+}
+```
+## Related works
 
 ### Medical Image Segmentation 
 
@@ -40,14 +68,8 @@ We plan to leverage large pre-trained Transformer Encoder to apply to various im
 * May 30: Review 2
 * June 6: Presentation
 * June 20: Final Report
-
-## Training dataset
-https://github.com/CancerDataScience/CrowdsourcingDataset-Amgadetal2019 
-
-Run ```sh download_crowdsourcing.sh``` in [code/crowdsourcing](code/crowdsourcing/) to download crowdsourcing breast cancer dataset from s3 bucket. 
-
 ### Trello Link
 https://trello.com/b/IwPkoJy9/ai604
 
 ## Project Gantt Chart
-![project_gantt_chart](images/project_gantt_chart.png)
+![project_gantt_chart](assets/project_gantt_chart.png)

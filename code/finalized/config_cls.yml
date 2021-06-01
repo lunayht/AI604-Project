@@ -1,0 +1,45 @@
+gpus: 1
+seed: 42
+checkpoint: 
+
+amp: True
+amp_backend: native
+distributed: True
+workers: 8
+
+wandb: True
+log_interval: 1
+val_check_interval: 1.0
+
+num_classes: 2
+train_split: 0.7
+
+max_epochs: 50
+batch_size: 16
+drop_rate: 0.0
+attention_drop_rate: 0.0
+
+accumulate_grad_batches: 4
+grad_clipping: False
+grad_max_norm: 1.0
+
+scheduler: False
+learning_rate: !!float 3e-5
+eps: !!float 1e-8
+beta_1: 0.99
+beta_2: 0.999
+weight_decay: !!float 1e-5
+warmup_proportion: 0.05
+
+image_size: [460, 700]
+patch_size: [32, 32]
+
+data_dir: dataset/breakhis
+magnification: 40X
+
+pad_mode: constant
+resize: False
+augmentation: True
+
+model_name: vit_base_patch32_384
+pretrained: True

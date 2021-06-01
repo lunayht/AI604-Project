@@ -1,0 +1,18 @@
+# Caches
+__pycache__
+*.ipynb_checkpoints
+.vscode
+
+# Dataset & Weights (too large)
+*.tar.gz
+*.npz
+checkpoints
+dataset/*
+
+# Logs
+wandb
+logs
+
+# Some scripts
+git.sh
+setup.sh

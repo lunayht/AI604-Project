@@ -1,5 +1,5 @@
 """
-Run this script to download CrowdsourcingDataset-Amgadetal2019 from S3.
+    Download helper for CrowdsourcingDataset-Amgadetal2019 from S3
 """
 
 import boto3
