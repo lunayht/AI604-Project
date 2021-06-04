@@ -3,7 +3,7 @@ DATASET_PATH=dataset
 mkdir -p $DATASET_PATH
 
 echo "Download BreakHis (Classification) Dataset ..."
-python download/download_cls.py
+python -c "import gdown; gdown.download('https://drive.google.com/u/1/uc?id=1bd60s98V3W00R_N7tvOE5pfoDaf8lpfv&export=download', 'combined.tar.gz', quiet=False)"
 tar -xvxf combined.tar.gz --directory $DATASET_PATH
 mv $DATASET_PATH/combined $DATASET_PATH/breakhis && rm combined.tar.gz
 
@@ -18,4 +18,3 @@ mv $DATASET_PATH/meta $DATASET_PATH/crowdsourcing
 
 echo "Preprocessing CrowdSourcing (Segmentation) Dataset ..."
 python download/preprocess_seg.py
-python download/train_test_split.py

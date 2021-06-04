@@ -1,6 +1,8 @@
 import torch
 import timm.models.vision_transformer
 
+from torch import nn
+
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     """
     VisionTransformer
@@ -31,7 +33,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         if self.dist_token is None:
             return self.pre_logits(x)
         else:
-            return x
+            return x 
 
     def forward(self, x):
         """

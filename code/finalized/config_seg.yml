@@ -1,46 +1,47 @@
-gpus: 1
+gpus: "0,1,2,3" 
 seed: 42
+checkpoint: 
 
 amp: True
 amp_backend: native
-workers: 4
+distributed: True
+workers: 0
 
 wandb: True
 log_interval: 1
 val_check_interval: 0.5
 
-num_classes: 2
-train_split: 0.7
+num_classes: 22
+train_split: 0.8
 
 max_epochs: 75
 batch_size: 16
-drop_rate: 0.3
+drop_rate: 0.0
+attention_drop_rate: 0.0
 
-accumulate_grad_batches: 8
+accumulate_grad_batches: 4
 grad_clipping: False
 grad_max_norm: 1.0
 
-scheduler: False
-learning_rate: !!float 3e-5
+learning_rate: !!float 1e-3
 eps: !!float 1e-8
 beta_1: 0.99
 beta_2: 0.999
-weight_decay: !!float 1e-4
-warmup_proportion: 0.15
+weight_decay: !!float 1e-5
+warmup_proportion: 0.05
 
-image_size: [460, 700]
+image_size: [512, 512]
 patch_size: [32, 32]
 
-data_dir: dataset/crowdsourcing
-
-pad_mode: constant
-resize: True
+data_dir: dataset/crowdsourcing/patches
 augmentation: True
 
 model_name: vit_base_patch32_384
 pretrained: True
 
+loss_type: ce
 head_type: transformer
-hidden_dim: 512
-num_layers: 6
-num_heads: 8
+
+hidden_dim: 3072
+num_layers: 2
+num_heads: 12

@@ -4,10 +4,13 @@ import glob
 import cv2
 import torch
 import numpy as np
+import albumentations as alb
 
 from functools import lru_cache
 from torch.utils.data import Dataset
 from typing import List, Tuple, Optional
+
+cv2.setNumThreads(0)
 
 """
     NOTE: The classes can be put into sub-classes.
@@ -67,6 +70,8 @@ class BreakHisDataset(Dataset):
             paths = os.path.join(data_path, self.magnification, '*.png')
             self.files += glob.glob(paths)
 
+        assert len(self.files) > 0, "No image files found."
+
         # Function for getting the label
         if num_classes == 8:
             self.get_label = lambda x: LABELS.get(x.split('_')[2].split('-')[0])
@@ -86,14 +91,15 @@ class BreakHisDataset(Dataset):
 
     def __getitem__(self, idx):
         f = self.files[idx]
-        return self.cache(f)    
+        return self.cache(f)
+
 class ClassificationBatchCollector:
     """Batch collector for classification using in DataLoader.collate_fn"""
     def __init__(
         self,
         image_size : Tuple[int, int], # This is input size for model
         patch_size : Tuple[int, int],
-        transforms : "Transform",
+        transforms : "alb.Transform",
         pad_mode : Optional[str]="constant",
         resize   : Optional[bool]=False
     ):
@@ -130,36 +136,55 @@ class ClassificationBatchCollector:
         )
         return padded
 
-
-
-
 class CrowdsourcingDataset(Dataset):
-    def __init__(
-        self,
-        data_path: Optional[str]='dataset/crowdsourcing',
-        split: Optional[str]='train'
-    ):
+    def __init__(self, data_path: Optional[str]='dataset/crowdsourcing/patch-512-reflect'):
         super().__init__()
 
-        img_path = os.path.join(data_path, split, 'images', '*.png')
-        msk_path = os.path.join(data_path, split, 'masks', '*.png')
+        img_path = os.path.join(data_path, 'images', '*.png')
+        msk_path = os.path.join(data_path, 'masks', '*.png')
         self.image_files = glob.glob(img_path)
         self.mask_files  = glob.glob(msk_path)
 
-        assert len(self.image_files) == len(self.mask_files)
+        assert len(self.image_files) > 0, "No image files found."
+        assert all([
+            os.path.basename(i) == os.path.basename(j) \
+                for i,j in zip(self.image_files, self.mask_files)
+        ]), "Image and mask files do not match."
 
     @lru_cache(maxsize=None)
-    def io_cache(self, img, msk):
+    def cache(self, img, msk):
         img = cv2.imread(img)
-        img = cv2.cvtColor(img, cv2.COLOR_BAYER_BGR2RGB)
-
-        msk = cv2.imread(msk)
-        msk = np.array(msk, dtype=np.float32)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        msk = cv2.imread(msk, cv2.IMREAD_GRAYSCALE)
         return img, msk
     
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        img, mask = self.image_files[idx], self.label_files[idx]
-        # TODO
+        img, msk = self.image_files[idx], self.mask_files[idx]
+        return self.cache(img, msk)
+
+class SegmentationBatchCollector:
+    def __init__(self, augmentation: "alb.Transform"=None, num_classes: int=22, pad_id: int=100):
+        self.augmentation = augmentation
+        self.normalize = alb.Normalize(
+            mean=[0.5, 0.5, 0.5],
+            std=[0.5, 0.5, 0.5]
+        )
+        self.num_classes = num_classes
+        self.pad_id = pad_id
+
+    def __call__(self, batch):
+        images, masks = zip(*batch)
+        # Same augmentation done on image and mask
+        if self.augmentation is not None:
+            augmented = [self.augmentation(image=image, mask=mask) for image, mask in batch]
+            images = [aug['image'] for aug in augmented]
+            masks  = [aug['mask'] for aug in augmented]
+        images = [self.normalize(image=image)['image'] for image in images]
+        images = [image.transpose(2, 0, 1) for image in images]
+        # images = [cv2.resize(image, (512, 512)) for image in images]
+        # masks  = [cv2.resize(mask, (512, 512)) for mask in masks]
+        images, masks = torch.tensor(images), torch.tensor(masks)
+        return images, masks.long()

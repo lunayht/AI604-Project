@@ -22,15 +22,19 @@ class ViTForClassification(nn.Module):
             attn_drop_rate=args.attention_drop_rate
         )
         self.head = nn.Linear(self.encoder.embed_dim, args.num_classes)
+        if self.encoder.dist_token is not None:
+            self.head_dist = nn.Linear(self.encoder.embed_dim, args.num_classes)
 
     def forward(self, x):
         x, _ = self.encoder(x)
         if self.encoder.dist_token is None:
-            x = x[:, 0]
+            return self.head(x[:, 0])
         else:
-            x = (x[:,0] + x[:,1]) * 0.5
-        x = self.head(x)
-        return x
+            c, d = self.head(x[:,0]), self.head_dist(x[:,1])
+            if self.training:
+                return c, d
+            else:
+                return (c + d) * 0.5
 
 class TransformerHead(nn.Module):
     """
@@ -120,15 +124,22 @@ class ViTForSegmentation(nn.Module):
                     padding=1
                 )
             )
+        elif self.head_type == 'linear':
+            self.head = nn.Linear(
+                self.encoder.embed_dim,
+                args.num_classes
+            )
+            self.upsample = Upsample(
+                image_size=args.image_size,
+                patch_size=args.patch_size
+            )
         else:
-            # Assertion for no None values for necessary args
-            assert not all(args.hidden_dim, args.num_layers, args.num_heads, args.head_type)
             self.head = TransformerHead(
                 num_classes=args.num_classes,
                 embed_dim=self.encoder.embed_dim,
                 hidden_dim=args.hidden_dim,
                 num_layers=args.num_layers,
-                num_heads=args.num_heads,
+                num_heads=args.num_heads
             )
             self.scale = self.encoder.embed_dim ** 0.5
             self.upsample = Upsample(
@@ -142,9 +153,15 @@ class ViTForSegmentation(nn.Module):
         if self.head_type == 'convolution':
             x = self.head(x)
             return x
+        elif self.head_type == 'linear':
+            x = self.head(x)
+            x = self.upsample(x)
+            x = x.permute(0, 2, 3, 1)
+            return x
         else:
             c, p = self.head(x)
             mask = p @ c.transpose(1,2)
             mask = torch.softmax(mask / self.scale, dim=-1)
             x = self.upsample(mask)
+            x = x.permute(0, 2, 3, 1)
             return x

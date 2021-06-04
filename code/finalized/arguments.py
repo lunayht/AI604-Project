@@ -17,8 +17,6 @@ class BaseArgs:
     log_interval: int = field(default=5)
     val_check_interval: float = field(default=0.5) # Evaluate 2 times every epoch
 
-    image_size: Tuple[int] = field(default=(460, 700))
-    patch_size: Tuple[int] = field(default=(32, 32))
     num_classes: int = field(default=2) # Number of classes
     train_split: float = field(default=0.7)
     
@@ -55,6 +53,9 @@ class ClassificationArgs(BaseArgs):
     data_dir: str = field(default='./data/breakhis')
     magnification: str = field(default='40X')
 
+    image_size: Tuple[int] = field(default=(460, 700))
+    patch_size: Tuple[int] = field(default=(32, 32))
+
     pad_mode: str = field(default='constant')
     augmentation: bool = field(default=False)
     resize: bool = field(default=False)
@@ -62,7 +63,14 @@ class ClassificationArgs(BaseArgs):
 @dataclass
 class SegmentationArgs(BaseArgs):
     data_dir: str = field(default='./data/crowdsourcing')
+    augmentation: bool = field(default=True)
+
+    image_size: Tuple[int] = field(default=(512, 512))
+    patch_size: Tuple[int] = field(default=(32, 32))
+
+    loss_type: str = field(default='ce')
     head_type: str = field(default='transformer')
+
     hidden_dim: int = field(default=512)
     num_layers: int = field(default=6)
     num_heads: int = field(default=8)

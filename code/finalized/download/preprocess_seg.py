@@ -1,79 +1,68 @@
-#!/usr/bin/env python3
-import cv2
-import numpy as np
 import os
+import cv2
 
-from PIL import Image
-from torchvision.transforms.functional import pad
-from typing import Tuple
+import numpy as np
+import pandas as pd
 
-IMAGES_PATH = "dataset/crowdsourcing/images"  # Original Images Folder
-MASKS_PATH = "dataset/crowdsourcing/masks"  # Original Masks Folder
-IMAGE_PATCHES = "dataset/crowdsourcing/patches/images"  # Destination (Images)
-MASK_PATCHES = "dataset/crowdsourcing/patches/masks"  # Destination (Masks)
-PATCH_SIZE = 512
+from tqdm import tqdm
+from patchify import patchify
+from sklearn.model_selection import train_test_split
 
+def extract_patches(image_list, mask_src, image_src, mask_dst, image_dst, patch_size):
+    """Reads image and mask then extract patches and disregard patches outside of RoI"""
+    for im in tqdm(image_list):
+        img = cv2.imread(os.path.join(image_src, im))
+        msk = cv2.imread(os.path.join(mask_src, im), 0)
 
-def create_folder(foldername: str):
-    """Create folder to store patches"""
-    if not os.path.isdir(foldername):
-        os.makedirs(foldername)
+        img_patches = patchify(img, (patch_size, patch_size, 3), step=patch_size)
+        msk_patches = patchify(msk, (patch_size, patch_size), step=patch_size)
+        img_patches = img_patches.reshape((-1, patch_size, patch_size, 3))
+        msk_patches = msk_patches.reshape((-1, patch_size, patch_size))
+        # Step=256 for patch_sie patches means no overlap
+        for i in range(img_patches.shape[0]):
+            mask_patch = msk_patches[i]
+            unique  = np.unique(mask_patch)
+            outside = np.all(mask_patch == 0)
+            if not outside and (len(unique) > 1):
+                img_patch = img_patches[i]
+                filename = im.split(".png")[0] + "_" + str(i) + ".png"
+                cv2.imwrite(os.path.join(image_dst, filename), img_patch)
+                cv2.imwrite(os.path.join(mask_dst, filename), mask_patch)
 
+def create_folder(path):
+    if not os.path.isdir(path):
+        os.makedirs(path)
 
-def compute_pixel_diff(ori_size: int, patch_size: int = 1024) -> int:
-    """Compute pixel different for padding purpose"""
-    return patch_size - (ori_size % patch_size)
+if __name__ == '__main__':
+    df = pd.read_csv('download/pathdata.csv')
+    train_df, test_df= train_test_split(df, test_size=0.2, random_state=42)
+    
+    image_path = 'dataset/crowdsourcing/images/'
+    mask_path  = 'dataset/crowdsourcing/masks/'
+    
+    create_folder('dataset/crowdsourcing/patches')
+    create_folder('dataset/crowdsourcing/patches/train')
+    create_folder('dataset/crowdsourcing/patches/train/masks')
+    create_folder('dataset/crowdsourcing/patches/train/images')
 
+    create_folder('dataset/crowdsourcing/patches/test')
+    create_folder('dataset/crowdsourcing/patches/test/masks')
+    create_folder('dataset/crowdsourcing/patches/test/images')
 
-def compute_padding_size(pixels: int) -> Tuple[int, int]:
-    """Compute padding size for each side (left, right) or (top, bottom)"""
-    pad_size = pixels // 2
-    return (pad_size, pad_size) if (pixels % 2 == 0) else (pad_size, pad_size + 1)
+    # Process train saet
+    image_list = train_df.images_path.values.tolist()
+    mask_src   = mask_path
+    image_src  = image_path
+    mask_dst   = 'dataset/crowdsourcing/patches/train/masks/'
+    image_dst  = 'dataset/crowdsourcing/patches/train/images/'
+    patch_size = 512
+    extract_patches(image_list, mask_src, image_src, mask_dst, image_dst, patch_size)
 
-
-def get_padding(img: np.ndarray, patch_size: int = 1024) -> Tuple[int, int, int, int]:
-    """Get padding size for four sides"""
-    diff_height = compute_pixel_diff(img.shape[0], patch_size)
-    diff_width = compute_pixel_diff(img.shape[1], patch_size)
-    horizontal_pad = compute_padding_size(diff_height)
-    vertical_pad = compute_padding_size(diff_width)
-    return (vertical_pad[0], horizontal_pad[0], vertical_pad[1], horizontal_pad[1])
-
-
-def pad_image(img: np.ndarray, patch_size: int = 1024) -> np.ndarray:
-    """Pad image/ mask according to padding size"""
-    padding = get_padding(img, patch_size)
-    return np.array(pad(Image.fromarray(img), padding))
-
-
-def generate_image_patches(img: np.ndarray, patch_size: int = 1024):
-    """Generate patches for each original image/ mask"""
-    for y in range(0, img.shape[0], patch_size):
-        y_end = y + patch_size
-        for x in range(0, img.shape[1], patch_size):
-            x_end = x + patch_size
-            yield img[y:y_end, x:x_end]
-
-
-if __name__ == "__main__":
-    create_folder(IMAGE_PATCHES)
-    create_folder(MASK_PATCHES)
-
-    filelist = os.listdir(IMAGES_PATH)
-    for count, filename in enumerate(filelist):
-        img = cv2.imread(os.path.join(IMAGES_PATH, filename))
-        mask = cv2.imread(os.path.join(MASKS_PATH, filename), 0)
-        new_img = pad_image(img, PATCH_SIZE)
-        new_mask = pad_image(mask, PATCH_SIZE)
-        idx = 0
-        for img_patch, mask_patch in zip(
-            generate_image_patches(new_img, PATCH_SIZE),
-            generate_image_patches(new_mask, PATCH_SIZE),
-        ):
-            outside_roi = np.all(mask_patch == 0)
-            if not outside_roi:
-                savename = filename.split(".png")[0] + "_" + str(idx) + ".png"
-                cv2.imwrite(os.path.join(IMAGE_PATCHES, savename), img_patch)
-                cv2.imwrite(os.path.join(MASK_PATCHES, savename), mask_patch)
-                idx += 1
-        print(f"Done {round(count/len(filelist)*100, 2)}% : {filename} ({idx} patches)")
+    # Process test set
+    image_list = test_df.images_path.values.tolist()
+    mask_src   = mask_path
+    image_src  = image_path
+    mask_dst   = 'dataset/crowdsourcing/patches/test/masks/'
+    image_dst  = 'dataset/crowdsourcing/patches/test/images/'
+    patch_size = 512
+    extract_patches(image_list, mask_src, image_src, mask_dst, image_dst, patch_size)

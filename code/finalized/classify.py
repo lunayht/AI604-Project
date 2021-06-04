@@ -1,5 +1,3 @@
-from os import confstr
-import cv2
 import yaml
 import wandb
 import torch
@@ -29,10 +27,7 @@ from loader import ClassificationBatchCollector, BreakHisDataset, LABELS, BIN_LA
 
 
 class ClassificationModel(pl.LightningModule):
-    def __init__(
-        self,   
-        args: "Namespace"
-    ):
+    def __init__(self, args: "Namespace"):
         super().__init__()
 
         self.args = args
@@ -78,7 +73,9 @@ class ClassificationModel(pl.LightningModule):
             normalize='true'
         )
         self.valid_metrics = MetricCollection(metrics, prefix='valid_')
+
         self.matrix = None
+        self.best_acc = -1
 
     def setup(self, stage):
         if stage == 'fit':
@@ -95,11 +92,7 @@ class ClassificationModel(pl.LightningModule):
         self.train_metrics(logits.softmax(-1), labels)
         return losses
 
-
     def training_epoch_end(self, outputs):
-        # preds  = torch.cat([i['prediction'].view(-1, i['prediction'].shape[-1]) for i in outputs])
-        # labels = torch.cat([i['target'].view(-1) for i in outputs])
-        # self.train_metrics(preds, labels)
         scores = self.train_metrics.compute()
         self.train_metrics.reset()
         self.log_dict(scores)
@@ -114,12 +107,19 @@ class ClassificationModel(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         scores = self.valid_metrics.compute()
         self.valid_metrics.reset()
-
-        self.matrix = scores.pop('valid_confusion_matrix')
+        matrix = scores.pop('valid_confusion_matrix')
+        if self.best_acc < scores['valid_top1']:
+            self.best_acc = scores['valid_top1']
+            self.matrix = matrix
         self.log_dict(scores)
+
+    def on_fit_end(self):
+        plot = self.plot_confusion_matrix(self.matrix, self.args.num_classes)
+        self.logger.experiment.log({'confusion_matrix': wandb.Image(plot)})
 
     @staticmethod
     def plot_confusion_matrix(matrix: torch.Tensor, num_classes: int):
+        matrix = matrix.cpu().numpy()
         label_dict = {'B': 0, 'M': 1}
         if num_classes == 8:
             label_dict = {k: v for k, v in LABELS.items()}
@@ -194,13 +194,14 @@ class ClassificationDataModule(pl.LightningDataModule):
         
         # Transforms
         base_transform = [
+            # Resize maybe needed for a pixel difference (just to concatenate the batch)
             alb.Resize(
                 height=args.image_size[0],
-                width=args.image_size[1]
+                width =args.image_size[1]
             ),
             alb.Normalize(
                 mean=[0.5, 0.5, 0.5],
-                std=[0.5, 0.5, 0.5]
+                std =[0.5, 0.5, 0.5]
             )
         ]
         train_transform = list()
@@ -275,7 +276,7 @@ if __name__ == '__main__':
     run_name = 'cls-{}-{}-{}-{}-{}{}-{}'.format(
         args.model_name,
         'pretrained' if args.pretrained else 'scratch',
-        'resized' if args.resize else 'as-is',
+        'resized' if args.resize else 'as_is',
         args.magnification,
         'msb' if args.num_classes < 3 else 'msm',
         '-aug' if args.augmentation else '',

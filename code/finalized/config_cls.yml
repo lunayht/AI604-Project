@@ -4,7 +4,7 @@ checkpoint:
 
 amp: True
 amp_backend: native
-distributed: True
+distributed: False
 workers: 8
 
 wandb: True
@@ -14,7 +14,7 @@ val_check_interval: 1.0
 num_classes: 2
 train_split: 0.7
 
-max_epochs: 50
+max_epochs: 40
 batch_size: 16
 drop_rate: 0.0
 attention_drop_rate: 0.0
