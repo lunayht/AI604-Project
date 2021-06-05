@@ -1,105 +1,118 @@
 import torch
 import numpy as np
 
+from typing import Optional
+
 from torch import nn
 from torch.nn import functional as F
 
-def make_one_hot(input, num_classes):
-    """Convert class index tensor to one hot encoding tensor.
-    Args:
-         input: A tensor of shape [N, 1, *]
-         num_classes: An int of number of class
-    Returns:
-        A tensor of shape [N, num_classes, *]
+"""Functional criterions for semantic segmentation tasks.
 
-    Taken from 
-        - https://github.com/hubutui/DiceLoss-PyTorch
+Args:
+    - pred: torch.Tensor([N, C, H, W])
+    - true: torch.Tensor([N, H, W])
+Return:
+    - loss: torch.Tensor([1])
+"""
+
+"""
+    NOTE: For DiceLoss, use TverskyLoss with (alpha, beta) = (0.5, 0.5)
+"""
+class CELoss(nn.Module):
+    """Cross Entropy Loss with logits (before softmax).
+       Modularized to handle image input.
     """
-    shape = np.array(input.shape)
-    shape[1] = num_classes
-    shape = tuple(shape)
-    result = torch.zeros(shape)
-    result = result.scatter_(1, input.cpu(), 1)
-
-    return result
-
-
-class BinaryDiceLoss(nn.Module):
-    """Dice loss of binary class
-    Args:
-        smooth: A float number to smooth loss, and avoid NaN error, default: 1
-        p: Denominator value: \sum{x^p} + \sum{y^p}, default: 2
-        predict: A tensor of shape [N, *]
-        target: A tensor of shape same with predict
-        reduction: Reduction method to apply, return mean over batch if 'mean',
-            return sum if 'sum', return a tensor of shape [N,] if 'none'
-    Returns:
-        Loss tensor according to arg reduction
-    Raise:
-        Exception if unexpected reduction
-
-    Taken from 
-        - https://github.com/hubutui/DiceLoss-PyTorch
-    """
-    def __init__(self, smooth=1, p=2, reduction='mean'):
-        super(BinaryDiceLoss, self).__init__()
-        self.smooth = smooth
-        self.p = p
-        self.reduction = reduction
-
-    def forward(self, predict, target):
-        assert predict.shape[0] == target.shape[0], "predict & target batch size don't match"
-        predict = predict.contiguous().view(predict.shape[0], -1)
-        target = target.contiguous().view(target.shape[0], -1)
-
-        num = torch.sum(torch.mul(predict, target), dim=1) + self.smooth
-        den = torch.sum(predict.pow(self.p) + target.pow(self.p), dim=1) + self.smooth
-
-        loss = 1 - num / den
-
-        if self.reduction == 'mean':
-            return loss.mean()
-        elif self.reduction == 'sum':
-            return loss.sum()
-        elif self.reduction == 'none':
-            return loss
-        else:
-            raise Exception('Unexpected reduction {}'.format(self.reduction))
-
-
-class DiceLoss(nn.Module):
-    """Dice loss, need one hot encode input
-    Args:
-        weight: An array of shape [num_classes,]
-        ignore_index: class index to ignore
-        predict: A tensor of shape [N, C, *]
-        target: A tensor of same shape with predict
-        other args pass to BinaryDiceLoss
-    Return:
-        same as BinaryDiceLoss
-
-    Taken from 
-        - https://github.com/hubutui/DiceLoss-PyTorch
-    """
-    def __init__(self, weight=None, ignore_index=None, **kwargs):
-        super(DiceLoss, self).__init__()
-        self.kwargs = kwargs
+    def __init__(
+        self,
+        weight: Optional[torch.Tensor]=None,
+        ignore_index: Optional[int]=None
+    ):
+        super().__init__()
         self.weight = weight
         self.ignore_index = ignore_index
 
-    def forward(self, predict, target):
-        assert predict.shape == target.shape, 'predict & target shape do not match'
-        dice = BinaryDiceLoss(**self.kwargs)
-        total_loss = 0
-        predict = F.softmax(predict, dim=1)
+    def forward(self, pred, true):
+        assert pred.shape[0] == true.shape[0]
+        C = pred.shape[1]
+        pred = pred.permute(0, 2, 3, 1).reshape(-1, C)
+        true = true.view(-1)
+        return F.cross_entropy(
+            pred, true,
+            weight=self.weight,
+            ignore_index=self.ignore_index
+        )
 
-        for i in range(target.shape[1]):
-            if i != self.ignore_index:
-                dice_loss = dice(predict[:, i], target[:, i])
-                if self.weight is not None:
-                    assert self.weight.shape[0] == target.shape[1], \
-                        'Expect weight shape [{}], get[{}]'.format(target.shape[1], self.weight.shape[0])
-                    dice_loss *= self.weights[i]
-                total_loss += dice_loss
+class TverskyLoss(nn.Module):
+    """Dice Loss with logits (before softmax)."""
+    def __init__(
+        self,
+        alpha: float,
+        beta: float,
+        eps: float=1e-8,
+        ignore_index: Optional[int]=None
+    ):
+        super().__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.eps = eps
+        self.ignore_index = ignore_index
+    
+    def forward(self, pred, true):
+        assert pred.shape[0] == true.shape[0]
+        C = pred.shape[1]
+        # Flatten / one-hot
+        pred = pred.permute(0, 2, 3, 1).reshape(-1, C)
+        true = F.one_hot(true.view(-1), C)
+        pred = pred.log_softmax(dim=1).exp()
+        # Remove ignore_index
+        if self.ignore_index is not None:
+            mask = torch.ones(true.shape, dtype=torch.bool)
+            mask[:, self.ignore_index] = False
+            true = true[mask]
+            pred = pred[mask]
+        sect = torch.sum(true * pred)
+        fp = torch.sum(pred * (-true + 1.0))
+        fn = torch.sum((-pred + 1.0) * true)
+        loss = 1. - sect / (sect + self.alpha * fp + self.beta * fn + self.eps)
+        return loss
 
-        return total_loss/target.shape[1]
+class FocalLoss(nn.Module):
+    """Focal Loss with logits (before softmax)."""
+    def __init__(
+        self,
+        gamma: float=0.1,
+        alpha: Optional[float]=None,
+        ignore_index: Optional[int]=None
+    ):
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.ignore_index = ignore_index
+    
+    def forward(self, pred, true):
+        assert pred.shape[0] == true.shape[0]
+        C = pred.shape[1]
+        # Flatten / one-hot
+        pred = pred.permute(0, 2, 3, 1).reshape(-1, C)
+        true = F.one_hot(true.view(-1), C)
+        pred = pred.log_softmax(dim=1)
+        # Remove ignore_index
+        if self.ignore_index is not None:
+            mask = torch.ones(true.shape, dtype=torch.bool)
+            mask[:, self.ignore_index] = False
+            true = true[mask]
+            pred = pred[mask]
+        
+        loss =  -(true * pred) * ((1 - pred) ** self.gamma) * true * self.alpha
+        return loss.mean()
+
+if __name__ == '__main__':
+    pred = torch.randn([16, 22, 256, 256])
+    true = torch.randint(10, [16, 256, 256])
+
+    loss_1 = CELoss(ignore_index=0)
+    loss_2 = FocalLoss(gamma=2, alpha=0.25, ignore_index=0)
+    loss_3 = TverskyLoss(0.5, 0.5, ignore_index=0)
+    print('Cross Entropy Loss: ', loss_1(pred, true))
+    print('Focal Loss: ', loss_2(pred, true))
+    print('Tversky Loss: ', loss_3(pred, true))

@@ -6,38 +6,32 @@ This repository contains the code for using Vision Transformer (ViT) for breast 
 The repository has the following file structure:
 
 ```bash
+├── README.md
+├── kill_zombie.sh
 ├── env.yml
 ├── config_cls.yml
 ├── config_seg.yml
-├── README.md
 ├── arguments.py
 ├── classify.py
-├── segment.py
+├── criterion.py
 ├── loader.py
-├── kill_zombie.sh
+├── metrics.py
+├── segment.py
 ├── download
-│   ├── download_cls.py
 │   ├── download_data.sh
 │   ├── download_seg.py
-│   ├── preprocess_seg.py
-│   └── train_test_split.py
-├── dataset
-│   ├── breakhis
-│   └── crowdsourcing
-├── legacy
-│   ├── classify_accelerate.py
-│   ├── config.yml
-│   └── test.py
+│   ├── path_data.csv
+│   └── preprocess_seg.py
 └── models
+    ├── __init__.py
     ├── transformer
+    │   ├── __init__.py
     │   ├── parts.py
     │   └── vit.py
     └── unet
+        ├── __init__.py
         ├── parts.py
         └── unet.py
-
-
-
 ```
 
 ### Setting up the environment

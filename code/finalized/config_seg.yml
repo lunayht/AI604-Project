@@ -15,7 +15,7 @@ num_classes: 22
 train_split: 0.8
 
 max_epochs: 75
-batch_size: 16
+batch_size: 8
 drop_rate: 0.0
 attention_drop_rate: 0.0
 
@@ -23,6 +23,8 @@ accumulate_grad_batches: 4
 grad_clipping: False
 grad_max_norm: 1.0
 
+optimizer: SGD
+scheduler: linear
 learning_rate: !!float 1e-3
 eps: !!float 1e-8
 beta_1: 0.99
@@ -33,13 +35,17 @@ warmup_proportion: 0.05
 image_size: [512, 512]
 patch_size: [32, 32]
 
-data_dir: dataset/crowdsourcing/patches
+data_dir: dataset/crowdsourcing/patches-512
 augmentation: True
 
 model_name: vit_base_patch32_384
 pretrained: True
 
 loss_type: ce
+weighted: True
+alpha: 0.5
+beta: 0.5
+gamma: 2
 head_type: transformer
 
 hidden_dim: 3072

@@ -1,5 +1,6 @@
 import os
 from pytorch_lightning.core import step_result
+from torch._C import Value
 import yaml
 import wandb
 import torch
@@ -24,7 +25,7 @@ from simple_parsing import ArgumentParser
 
 from models.transformer import ViTForSegmentation
 
-from criterion import DiceLoss
+from criterion import TverskyLoss, CELoss, FocalLoss
 from arguments import SegmentationArgs
 from metrics import compute_dice, compute_miou
 from loader import CrowdsourcingDataset, SegmentationBatchCollector
@@ -41,10 +42,20 @@ class SegmentationModel(pl.LightningModule):
         self.lr = args.learning_rate
 
         self.model = ViTForSegmentation(args)
-        self.criterion = DiceLoss(ignore_index=0)
-        if args.loss_type == 'ce':
-            self.criterion = nn.CrossEntropyLoss(ignore_index=0)
-
+        
+        self.criterion = CELoss(ignore_index=0)
+        if args.loss_type == 'ce' and args.weighted:
+            weight = torch.Tensor([0, -1.7056154628344387, -1.9096164907424042, -8.070416753227825, -15.771018083763256, -17.976081307464334])
+            self.criterion = CELoss(weight=weight, ignore_index=0)
+        elif args.loss_type == 'dice':
+            self.criterion = TverskyLoss(alpha=0.5, beta=0.5, ignore_index=0)
+        elif args.loss_type == 'focal':
+            self.criterion = FocalLoss(alpha=args.alpha, gamma=args.gamma, ignore_index=0)
+        elif args.loss_type == 'tversky':
+            self.criterion = TverskyLoss(alpha=args.alpha, beta=args.beta, ignore_index=0)
+        else:
+            raise ValueError("The loss type {} is not supported ...".format(args.loss_type))
+        
         # Metric trackers
         metrics = {
             'pixel_acc': Accuracy(
@@ -75,9 +86,10 @@ class SegmentationModel(pl.LightningModule):
         logits = self(inputs)
         logits = logits.reshape(-1, logits.shape[-1])
         labels = labels.view(-1)
+        self.train_metrics(logits.softmax(-1), labels)
         losses = self.criterion(logits, labels)
         self.log('train_loss', losses, on_step=True, on_epoch=False, sync_dist=True, logger=True)
-        self.train_metrics(logits.softmax(-1), labels)
+        
         return losses
 
     def training_epoch_end(self, outputs):
@@ -93,7 +105,7 @@ class SegmentationModel(pl.LightningModule):
         logits = self(inputs)
         logits = logits.reshape(-1, logits.shape[-1])
         labels = labels.view(-1)
-        self.valid_metrics(logits.softmax(-1), labels)
+        self.valid_metrics(logits.softmax(-1), labels)        
 
     def validation_epoch_end(self, outputs):
         scores = self.valid_metrics.compute()
@@ -116,27 +128,34 @@ class SegmentationModel(pl.LightningModule):
                 'weight_decay': 0.0
             }
         ]
-        # optimizer = torch.optim.AdamW(
-        #     grouped_params, lr=self.args.learning_rate,
-        #     betas=(self.args.beta_1, self.args.beta_2),
-        #     weight_decay=self.args.weight_decay
-        # )
+        optimizer = getattr(torch.optim, self.args.optimizer)
+        optimizer = optimizer(grouped_params, lr=args.learning_rate)
+        if self.args.optimizer == 'AdamW':
+            optimizer = optimizer(
+                grouped_params, lr=self.args.learning_rate,
+                betas=(self.args.beta_1, self.args.beta_2),
+                weight_decay=self.args.weight_decay
+            )
         # Scheduler (linear schedule w/ torch.optim.lr_scheduler.LambdaLR)
-        # train_steps = self.train_steps
-        # warmup_steps = train_steps * self.args.warmup_proportion
-        # def linear_schedule(current_step: int):
-        #     """Function for LambdaLR. Must take current_step (int) as input."""
-        #     if current_step < warmup_steps:
-        #         return float(current_step) / float(max(1, warmup_steps))
-        #     return max(0., float(train_steps - current_step) / float(max(1, train_steps - warmup_steps)))
-        # scheduler = LambdaLR(optimizer, linear_schedule, -1)
-        optimizer = torch.optim.SGD(grouped_params, lr=args.learning_rate)
+
         train_steps = self.train_steps
+        warmup_steps = int(train_steps * self.args.warmup_proportion)
         def poly_schedule(current_step: int):
             if current_step > train_steps:
                 return 1e-6
             return (1 - current_step / train_steps) ** 0.9
-        scheduler = LambdaLR(optimizer, poly_schedule, -1)
+
+        def linear_schedule(current_step: int):
+            """Function for LambdaLR. Must take current_step (int) as input."""
+            if current_step < warmup_steps:
+                return float(current_step) / float(max(1, warmup_steps))
+            return max(0., float(train_steps - current_step) / float(max(1, train_steps - warmup_steps)))
+            
+        scheduler = LambdaLR(
+            optimizer,
+            linear_schedule if args.scheduler == 'linear' else poly_schedule,
+            -1
+        )
         return {'optimizer': optimizer, 'lr_scheduler': scheduler}
 
 class SegmentationDataModule(pl.LightningDataModule):
@@ -194,11 +213,13 @@ if __name__ == '__main__':
     pl_model = SegmentationModel(args)
 
     # WandB logger
-    run_name = 'seg-{}-{}-{}{}'.format(
+    run_name = 'seg-{}-{}-{}{}-{}-{}'.format(
         args.model_name,
         'pretrained' if args.pretrained else 'scratch',
         args.data_dir.split('/')[-1],
-        '-aug' if args.augmentation else ''
+        '-aug' if args.augmentation else '',
+        args.head_type,
+        args.loss_type
     )
 
     if args.wandb:

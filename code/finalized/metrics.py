@@ -37,4 +37,3 @@ def compute_miou(
         indices.remove(ignore_index)
         iou = iou[indices]
     return iou.mean()
-

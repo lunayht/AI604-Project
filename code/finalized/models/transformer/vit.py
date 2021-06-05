@@ -122,7 +122,10 @@ class ViTForSegmentation(nn.Module):
                     kernel_size=3,
                     stride=1,
                     padding=1
-                )
+                ),
+                Rearrange(
+                    "b p1 p2 c -> b c p1 p2"
+                )                
             )
         elif self.head_type == 'linear':
             self.head = nn.Linear(
@@ -152,16 +155,12 @@ class ViTForSegmentation(nn.Module):
         _, x = self.encoder(x)
         if self.head_type == 'convolution':
             x = self.head(x)
-            return x
         elif self.head_type == 'linear':
             x = self.head(x)
             x = self.upsample(x)
-            x = x.permute(0, 2, 3, 1)
-            return x
         else:
             c, p = self.head(x)
             mask = p @ c.transpose(1,2)
             mask = torch.softmax(mask / self.scale, dim=-1)
             x = self.upsample(mask)
-            x = x.permute(0, 2, 3, 1)
-            return x
+        return x
