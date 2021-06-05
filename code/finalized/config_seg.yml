@@ -11,7 +11,7 @@ wandb: True
 log_interval: 1
 val_check_interval: 0.5
 
-num_classes: 22
+num_classes: 6
 train_split: 0.8
 
 max_epochs: 75

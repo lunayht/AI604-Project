@@ -24,21 +24,19 @@ class CELoss(nn.Module):
     """
     def __init__(
         self,
-        weight: Optional[torch.Tensor]=None,
         ignore_index: Optional[int]=None
     ):
         super().__init__()
-        self.weight = weight
         self.ignore_index = ignore_index
 
-    def forward(self, pred, true):
+    def forward(self, pred, true, weight: Optional[torch.Tensor]=None):
         assert pred.shape[0] == true.shape[0]
         C = pred.shape[1]
         pred = pred.permute(0, 2, 3, 1).reshape(-1, C)
         true = true.view(-1)
         return F.cross_entropy(
             pred, true,
-            weight=self.weight,
+            weight=weight,
             ignore_index=self.ignore_index
         )
 

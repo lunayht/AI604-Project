@@ -4,11 +4,10 @@ from torch._C import Value
 import yaml
 import wandb
 import torch
-import numpy as np
 import pytorch_lightning as pl
 import albumentations as alb
 
-from math import ceil
+from typing import Optional
 import matplotlib.pyplot as plt
 
 from torch import nn
@@ -25,15 +24,15 @@ from simple_parsing import ArgumentParser
 
 from models.transformer import ViTForSegmentation
 
-from criterion import TverskyLoss, CELoss, FocalLoss
 from arguments import SegmentationArgs
 from metrics import compute_dice, compute_miou
+from criterion import TverskyLoss, CELoss, FocalLoss
 from loader import CrowdsourcingDataset, SegmentationBatchCollector
 
 
 
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, args: "Namespace"):
+    def __init__(self, args: "Namespace", weight: Optional[torch.Tensor]=None):
         super().__init__()
 
         self.args = args
@@ -42,17 +41,17 @@ class SegmentationModel(pl.LightningModule):
         self.lr = args.learning_rate
 
         self.model = ViTForSegmentation(args)
+        self.weight = weight
         
         self.criterion = CELoss(ignore_index=0)
-        if args.loss_type == 'ce' and args.weighted:
-            weight = torch.Tensor([0, -1.7056154628344387, -1.9096164907424042, -8.070416753227825, -15.771018083763256, -17.976081307464334])
-            self.criterion = CELoss(weight=weight, ignore_index=0)
-        elif args.loss_type == 'dice':
+        if args.loss_type == 'dice':
             self.criterion = TverskyLoss(alpha=0.5, beta=0.5, ignore_index=0)
         elif args.loss_type == 'focal':
             self.criterion = FocalLoss(alpha=args.alpha, gamma=args.gamma, ignore_index=0)
         elif args.loss_type == 'tversky':
             self.criterion = TverskyLoss(alpha=args.alpha, beta=args.beta, ignore_index=0)
+        elif args.loss_type == 'ce':
+            pass
         else:
             raise ValueError("The loss type {} is not supported ...".format(args.loss_type))
         
@@ -73,7 +72,7 @@ class SegmentationModel(pl.LightningModule):
         }
         self.train_metrics = MetricCollection(metrics, prefix='train_')
         self.valid_metrics = MetricCollection(metrics, prefix='valid_')
-
+    
     def setup(self, stage):
         if stage == 'fit':
             self.train_steps = len(self.train_dataloader()) * self.args.max_epochs // self.args.accumulate_grad_batches
@@ -84,12 +83,15 @@ class SegmentationModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         inputs, labels = batch
         logits = self(inputs)
-        logits = logits.reshape(-1, logits.shape[-1])
+        if self.args.weighted:
+            losses = self.criterion(logits, labels, self.weight.to(inputs.device))
+        else:
+            losses = self.criterion(logits, labels)
+        self.log('train_loss', losses, on_step=True, on_epoch=False, sync_dist=True, logger=True)
+
+        logits = logits.reshape(-1, logits.shape[1])
         labels = labels.view(-1)
         self.train_metrics(logits.softmax(-1), labels)
-        losses = self.criterion(logits, labels)
-        self.log('train_loss', losses, on_step=True, on_epoch=False, sync_dist=True, logger=True)
-        
         return losses
 
     def training_epoch_end(self, outputs):
@@ -103,7 +105,8 @@ class SegmentationModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         inputs, labels = batch
         logits = self(inputs)
-        logits = logits.reshape(-1, logits.shape[-1])
+
+        logits = logits.reshape(-1, logits.shape[1])
         labels = labels.view(-1)
         self.valid_metrics(logits.softmax(-1), labels)        
 
@@ -137,7 +140,6 @@ class SegmentationModel(pl.LightningModule):
                 weight_decay=self.args.weight_decay
             )
         # Scheduler (linear schedule w/ torch.optim.lr_scheduler.LambdaLR)
-
         train_steps = self.train_steps
         warmup_steps = int(train_steps * self.args.warmup_proportion)
         def poly_schedule(current_step: int):
@@ -210,7 +212,10 @@ if __name__ == '__main__':
 
     # Seeding and PL model
     pl.seed_everything(args.seed, workers=True)
-    pl_model = SegmentationModel(args)
+    weight = None
+    if args.weighted:
+        weight = torch.Tensor([0, -1.7056154628344387, -1.9096164907424042, -8.070416753227825, -15.771018083763256, -17.976081307464334])
+    pl_model = SegmentationModel(args, weight)
 
     # WandB logger
     run_name = 'seg-{}-{}-{}{}-{}-{}'.format(
@@ -238,7 +243,6 @@ if __name__ == '__main__':
         save_top_k=1,
         mode='max'
     )
-
     pl_data = SegmentationDataModule(args)
     
     print(args)
