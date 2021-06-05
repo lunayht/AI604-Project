@@ -83,7 +83,7 @@ class SegmentationModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         inputs, labels = batch
         logits = self(inputs)
-        if self.args.weighted:
+        if self.args.weighted and self.args.loss_type == 'ce':
             losses = self.criterion(logits, labels, self.weight.to(inputs.device))
         else:
             losses = self.criterion(logits, labels)
