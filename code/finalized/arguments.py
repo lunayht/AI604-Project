@@ -68,14 +68,15 @@ class SegmentationArgs(BaseArgs):
     image_size: Tuple[int] = field(default=(512, 512))
     patch_size: Tuple[int] = field(default=(32, 32))
 
-    optimizer: str = field(default='SGD')
+    optimizer: str = field(default='AdamW')
     scheduler: str = field(default='linear')
-    weighted: bool = field(default=True)
-    loss_type: str = field(default='ce')
+    
+    loss_type: str = field(default='cross_entropy')
     alpha: float = field(default=.5)
     beta: float = field(default=0.5)
     gamma: float = field(default=2)
-    head_type: str = field(default='transformer')
+
+    head_type: str = field(default='linear')
 
     hidden_dim: int = field(default=512)
     num_layers: int = field(default=6)

@@ -1,20 +1,18 @@
 import os
-from pytorch_lightning.core import step_result
-from torch._C import Value
+from re import M
 import yaml
 import wandb
 import torch
 import pytorch_lightning as pl
 import albumentations as alb
 
-from typing import Optional
-import matplotlib.pyplot as plt
+from einops import rearrange
 
-from torch import nn
+from torch.nn import functional as F
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 
-from torchmetrics import MetricCollection, Accuracy, IoU, ConfusionMatrix
+from torchmetrics import MetricCollection, ConfusionMatrix
 
 from pytorch_lightning.plugins import DDPPlugin
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -25,14 +23,11 @@ from simple_parsing import ArgumentParser
 from models.transformer import ViTForSegmentation
 
 from arguments import SegmentationArgs
-from metrics import compute_dice, compute_miou
-from criterion import TverskyLoss, CELoss, FocalLoss
+from metrics import compute_accuracy, compute_dice, compute_miou
 from loader import CrowdsourcingDataset, SegmentationBatchCollector
 
-
-
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, args: "Namespace", weight: Optional[torch.Tensor]=None):
+    def __init__(self, args: "Namespace"):
         super().__init__()
 
         self.args = args
@@ -41,28 +36,12 @@ class SegmentationModel(pl.LightningModule):
         self.lr = args.learning_rate
 
         self.model = ViTForSegmentation(args)
-        self.weight = weight
-        
-        self.criterion = CELoss(ignore_index=0)
-        if args.loss_type == 'dice':
-            self.criterion = TverskyLoss(alpha=0.5, beta=0.5, ignore_index=0)
-        elif args.loss_type == 'focal':
-            self.criterion = FocalLoss(alpha=args.alpha, gamma=args.gamma, ignore_index=0)
-        elif args.loss_type == 'tversky':
-            self.criterion = TverskyLoss(alpha=args.alpha, beta=args.beta, ignore_index=0)
-        elif args.loss_type == 'ce':
-            pass
-        else:
-            raise ValueError("The loss type {} is not supported ...".format(args.loss_type))
-        
+        self.weight = None
+        if args.loss_type == "weighted_cross_entropy":
+            self.weight = torch.Tensor([0, 0.9333333333333333, 0.8666666666666667, 0.6666666666666667, 0.8, 0.7333333333333334])
+
         # Metric trackers
         metrics = {
-            'pixel_acc': Accuracy(
-                compute_on_step=False,
-                dist_sync_on_step=True,
-                num_classes=self.num_classes,
-                ignore_index=0
-            ),
             'confusion_matrix': ConfusionMatrix(
                 compute_on_step=False,
                 dist_sync_on_step=True,
@@ -80,23 +59,66 @@ class SegmentationModel(pl.LightningModule):
     def forward(self, x):
         return self.model(x)
 
+    def criterion(
+        self,
+        logits, labels,
+        ignore_index: int=0
+    ):
+        """
+            Returns loss according to configuration.
+
+            Args:
+                - logits: torch.Tensor([b * h * w, c])
+                - labels: torch.Tensor([b * h * w])
+                - ignore_index: int = 0
+            Returns:
+                - losses: torch.Tensor([1])
+
+            NOTE: Dice is a special case of Tversky (alpha = 0.5, beta = 0.5)
+        """
+
+        loss_type = self.args.loss_type
+        if loss_type in ("weighted_cross_entropy", "cross_entropy"):
+            return F.cross_entropy(
+                logits, labels,
+                weight=self.weight.to(logits.device) if self.weight is not None else None,
+                ignore_index=ignore_index
+            )
+        labels = F.one_hot(labels, logits.shape[-1])
+        logits = logits.log_softmax(dim=-1).exp()
+        if ignore_index is not None:
+            mask = torch.ones(labels.shape, dtype=torch.bool)
+            mask[:, ignore_index] = False
+            logits = logits[mask]
+            labels = labels[mask]
+        if loss_type == "dice":
+            it = torch.sum(logits * labels)
+            fp = torch.sum(logits * (1. - labels))
+            fn = torch.sum(labels * (1. - logits))
+            return 1. - it / (it + 0.5 * fp + 0.5 * fn + 1e-15)
+        elif loss_type == "focal":
+            ls = -(logits * labels) * ((1. - logits) ** self.args.gamma) * labels * self.args.alpha
+            return ls.mean()
+        elif loss_type == "tversky":
+            it = torch.sum(logits * labels)
+            fp = torch.sum(logits * (1. - labels))
+            fn = torch.sum(logits * (1. - logits))
+            return 1. - it / (it + self.args.alpha * fp + self.args.beta * fn + 1e-15)
+
     def training_step(self, batch, batch_idx):
         inputs, labels = batch
         logits = self(inputs)
-        if self.args.weighted and self.args.loss_type == 'ce':
-            losses = self.criterion(logits, labels, self.weight.to(inputs.device))
-        else:
-            losses = self.criterion(logits, labels)
+        logits = rearrange(logits, 'b c h w -> (b h w) c')
+        labels = rearrange(labels, 'b h w -> (b h w)')
+        losses = self.criterion(logits, labels)
         self.log('train_loss', losses, on_step=True, on_epoch=False, sync_dist=True, logger=True)
-
-        logits = logits.reshape(-1, logits.shape[1])
-        labels = labels.view(-1)
         self.train_metrics(logits.softmax(-1), labels)
         return losses
 
     def training_epoch_end(self, outputs):
         scores = self.train_metrics.compute()
         matrix = scores.pop('train_confusion_matrix')
+        scores['train_pixel_acc'] = compute_accuracy(matrix)
         scores['train_miou'] = compute_miou(matrix)
         scores['train_dice'] = compute_dice(matrix)
         self.train_metrics.reset()
@@ -105,14 +127,14 @@ class SegmentationModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         inputs, labels = batch
         logits = self(inputs)
-
-        logits = logits.reshape(-1, logits.shape[1])
-        labels = labels.view(-1)
+        logits = rearrange(logits, 'b c h w -> (b h w) c')
+        labels = rearrange(labels, 'b h w -> (b h w)')
         self.valid_metrics(logits.softmax(-1), labels)        
 
     def validation_epoch_end(self, outputs):
         scores = self.valid_metrics.compute()
         matrix = scores.pop('valid_confusion_matrix')
+        scores['valid_pixel_acc'] = compute_accuracy(matrix)
         scores['valid_miou'] = compute_miou(matrix)
         scores['valid_dice'] = compute_dice(matrix)
         self.valid_metrics.reset()
@@ -132,13 +154,14 @@ class SegmentationModel(pl.LightningModule):
             }
         ]
         optimizer = getattr(torch.optim, self.args.optimizer)
-        optimizer = optimizer(grouped_params, lr=args.learning_rate)
         if self.args.optimizer == 'AdamW':
             optimizer = optimizer(
                 grouped_params, lr=self.args.learning_rate,
                 betas=(self.args.beta_1, self.args.beta_2),
                 weight_decay=self.args.weight_decay
             )
+        else:
+            optimizer = optimizer(grouped_params, lr=args.learning_rate)
         # Scheduler (linear schedule w/ torch.optim.lr_scheduler.LambdaLR)
         train_steps = self.train_steps
         warmup_steps = int(train_steps * self.args.warmup_proportion)
@@ -212,10 +235,7 @@ if __name__ == '__main__':
 
     # Seeding and PL model
     pl.seed_everything(args.seed, workers=True)
-    weight = None
-    if args.weighted:
-        weight = torch.Tensor([0, -1.7056154628344387, -1.9096164907424042, -8.070416753227825, -15.771018083763256, -17.976081307464334])
-    pl_model = SegmentationModel(args, weight)
+    pl_model = SegmentationModel(args)
 
     # WandB logger
     run_name = 'seg-{}-{}-{}{}-{}-{}'.format(

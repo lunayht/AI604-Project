@@ -1,4 +1,20 @@
+import torch
+
 from typing import Optional
+
+"""
+    Computes segmentation metrics with confusion matrix.
+"""
+
+def compute_accuracy(
+    matrix: "torch.Tensor",
+    ignore_index: Optional[int]=None
+):
+    if ignore_index is not None:
+        matrix = matrix[torch.arange(matrix.shape[0]) != ignore_index]
+        matrix = matrix[torch.arange(matrix.shape[1]) != ignore_index]
+    acc = matrix.diag().sum() / (matrix.sum() + 1e-15)
+    return acc
 
 def compute_dice(
     matrix: "torch.Tensor",

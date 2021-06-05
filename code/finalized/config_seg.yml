@@ -5,7 +5,7 @@ checkpoint:
 amp: True
 amp_backend: native
 distributed: True
-workers: 0
+workers: 8
 
 wandb: True
 log_interval: 1
@@ -16,16 +16,16 @@ train_split: 0.8
 
 max_epochs: 75
 batch_size: 8
-drop_rate: 0.0
+drop_rate: 0.3
 attention_drop_rate: 0.0
 
 accumulate_grad_batches: 4
 grad_clipping: False
 grad_max_norm: 1.0
 
-optimizer: SGD
+optimizer: AdamW
 scheduler: linear
-learning_rate: !!float 1e-3
+learning_rate: !!float 3e-6
 eps: !!float 1e-8
 beta_1: 0.99
 beta_2: 0.999
@@ -41,12 +41,11 @@ augmentation: True
 model_name: vit_base_patch32_384
 pretrained: True
 
-loss_type: ce
-weighted: True
+loss_type: cross_entropy
 alpha: 0.5
 beta: 0.5
 gamma: 2
-head_type: transformer
+head_type: linear
 
 hidden_dim: 3072
 num_layers: 2
